@@ -3,7 +3,8 @@ import json
 import os
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
+from uuid import uuid4
 from .core import Vault, Event
 
 
@@ -22,14 +23,13 @@ class Session:
         self.session_id = session_id or f"sess_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}_{os.urandom(3).hex()}"
         self.start_time = datetime.now(timezone.utc)
         self.auto_summarize = auto_summarize
-        self._events: list = []
+        self._events: List[Event] = []
 
         # Log session start
         self.log(
-            "session_start",
+            event_type="session_start",
             title=f"Session started — {project}",
             details=f"Session {self.session_id} initiated",
-            project=project,
             outcome="passed",
         )
 
@@ -40,9 +40,9 @@ class Session:
         details: Optional[str] = None,
         outcome: str = "passed",
         error: Optional[str] = None,
-        files_changed: Optional[list] = None,
-        tags: Optional[list] = None,
-        next_steps: Optional[list] = None,
+        files_changed: Optional[List[str]] = None,
+        tags: Optional[List[str]] = None,
+        next_steps: Optional[List[str]] = None,
     ) -> Event:
         """Log an event within this session."""
         event = self.vault.log_event(
@@ -64,13 +64,13 @@ class Session:
         self,
         title: str,
         details: Optional[str] = None,
-        files_changed: Optional[list] = None,
-        tags: Optional[list] = None,
-        next_steps: Optional[list] = None,
+        files_changed: Optional[List[str]] = None,
+        tags: Optional[List[str]] = None,
+        next_steps: Optional[List[str]] = None,
     ):
         """Context manager to log a task with its success/failure."""
         class TaskContext:
-            def __init__(self, session: Session, title: str, details: str, files: list, tags: list, steps: list):
+            def __init__(self, session: Session, title: str, details: str, files: List[str], tags: List[str], steps: List[str]):
                 self.session = session
                 self.title = title
                 self.details = details
@@ -116,7 +116,7 @@ class Session:
         title: str,
         details: str,
         reasoning: Optional[str] = None,
-        alternatives: Optional[list] = None,
+        alternatives: Optional[List[str]] = None,
     ) -> Event:
         """Log a decision with context."""
         full_details = details
@@ -166,19 +166,21 @@ class Session:
 
     def _build_summary(self, summary: Optional[str], mins: int, secs: int) -> str:
         """Build the session summary markdown."""
-        events = sorted(self._events, key=lambda e: e.timestamp if hasattr(e, 'timestamp') else e['timestamp'])
+        # Convert Event objects to dicts for sorting
+        events_serialized = [e.to_dict() if hasattr(e, 'to_dict') else e for e in self._events]
+        events_serialized.sort(key=lambda e: e.get("timestamp", ""))
 
         outcome_counts = {"passed": 0, "failed": 0, "skipped": 0}
-        for e in events:
-            outcome = e.outcome if hasattr(e, 'outcome') else e.get('outcome', 'passed')
+        for e in events_serialized:
+            outcome = e.get("outcome", "passed")
             outcome_counts[outcome] = outcome_counts.get(outcome, 0) + 1
 
         lines = [
             f"# Session {self.session_id}",
             f"\n**Duration:** {mins}m {secs}s",
             f"**Project:** {self.project}",
-            f"**Events logged:** {len(events)}",
-            f"**Outcomes:** {outcome_counts}",
+            f"**Events logged:** {len(events_serialized)}",
+            f"**Outcomes:** passed={outcome_counts['passed']} failed={outcome_counts['failed']} skipped={outcome_counts['skipped']}",
             f"\n---\n",
         ]
 
@@ -186,21 +188,20 @@ class Session:
             lines.append(f"## Summary\n\n{summary}\n")
 
         lines.append("## Event Log\n")
-        for evt in events:
-            evt_dict = evt.to_dict() if hasattr(evt, 'to_dict') else evt
+        for evt in events_serialized:
             icon = {"passed": "✅", "failed": "❌", "skipped": "⏭️", "session_start": "🚀", "session_end": "🏁"}.get(
-                evt_dict.get("outcome", "passed"), "•"
+                evt.get("outcome", "passed"), "•"
             )
-            type_label = evt_dict.get("type", "").replace("_", " ").title()
-            lines.append(f"{icon} **[{type_label}]** {evt_dict['title']}")
-            if evt_dict.get("error"):
-                lines.append(f"   > Error: {evt_dict['error']}")
-            if evt_dict.get("files_changed"):
-                for f in evt_dict["files_changed"]:
+            type_label = evt.get("type", "").replace("_", " ").title()
+            lines.append(f"{icon} **[{type_label}]** {evt['title']}")
+            if evt.get("error"):
+                lines.append(f"   > Error: {evt['error']}")
+            if evt.get("files_changed"):
+                for f in evt["files_changed"]:
                     lines.append(f"   📄 {f}")
-            if evt_dict.get("next_steps"):
+            if evt.get("next_steps"):
                 lines.append("   Next steps:")
-                for step in evt_dict["next_steps"]:
+                for step in evt["next_steps"]:
                     lines.append(f"     • {step}")
             lines.append("")
 

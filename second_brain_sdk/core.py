@@ -30,7 +30,13 @@ class Event:
         self.title = title
         self.details = details
         self.project = project
-        self.outcome = outcome  # "passed", "failed", "skipped", "cancelled"
+        # Infer outcome from type if not explicitly provided
+        if outcome == "passed" and event_type.endswith("_failed"):
+            self.outcome = "failed"
+        elif outcome == "passed" and event_type.endswith("_completed"):
+            self.outcome = "passed"
+        else:
+            self.outcome = outcome  # "passed", "failed", "skipped", "cancelled"
         self.error = error
         self.files_changed = files_changed or []
         self.tags = tags or []

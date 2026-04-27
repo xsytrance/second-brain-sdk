@@ -84,9 +84,15 @@ class TestSession:
         session = Session(vault, project="demo")
         with session.task("Demo task", tags=["example"]):
             pass  # succeeds
+        session.end("Test complete")  # End the session
         events = vault.get_events(project="demo")
         # should have session_start, task_started, task_completed, session_end
         assert len(events) == 4
+        types = [e["type"] for e in events]
+        assert "session_start" in types
+        assert "task_started" in types
+        assert "task_completed" in types
+        assert "session_end" in types
         completed = [e for e in events if e["type"] == "task_completed"]
         assert len(completed) == 1
 
@@ -98,10 +104,15 @@ class TestSession:
                 raise ValueError("Oops")
         except ValueError:
             pass
+        session.end("Test failure complete")
         events = vault.get_events(project="demo")
         failed = [e for e in events if e["type"] == "task_failed"]
         assert len(failed) == 1
         assert "Oops" in failed[0].get("error", "")
+        # Also check session_end logged
+        types = [e["type"] for e in events]
+        assert "session_start" in types
+        assert "session_end" in types
 
 
 class TestIdentity:
