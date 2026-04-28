@@ -1,10 +1,13 @@
 """Credential management with encryption."""
-from cryptography.fernet import Fernet
+
 import os
-from pathlib import Path
-from typing import Optional, Dict, Any, List
 from datetime import datetime, timezone
-from .core import Vault, Credential
+from pathlib import Path
+from typing import Any, Dict, List, Optional
+
+from cryptography.fernet import Fernet
+
+from .core import Credential, Vault
 
 
 class CredentialManager:
@@ -58,7 +61,9 @@ class CredentialManager:
                 self.vault._encrypt_and_save()
                 break
 
-    def rotate(self, cred_id: str, new_value: str, reason: str = "Scheduled rotation") -> Credential:
+    def rotate(
+        self, cred_id: str, new_value: str, reason: str = "Scheduled rotation"
+    ) -> Credential:
         """Replace an existing credential with a new value, logging rotation."""
         # Decrypt old one to get metadata
         old_meta = None

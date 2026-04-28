@@ -156,7 +156,9 @@ class Brain:
         self._store().touch_credential_last_used(cred_id, _now())
         return value
 
-    def list_credentials(self, *, service: Optional[str] = None) -> list[dict[str, Any]]:
+    def list_credentials(
+        self, *, service: Optional[str] = None
+    ) -> list[dict[str, Any]]:
         self.init()
         rows = self._store().list_credentials(service=service)
         # never return decrypted values

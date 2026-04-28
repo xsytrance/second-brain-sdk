@@ -17,11 +17,22 @@ def run():
     agent_id = "my-agent"
 
     user_message = "Hello"
-    brain.log_event(type="task_started", title=f"Respond to: {user_message}", agent_id=agent_id, tags=["conversation"])
+    brain.log_event(
+        type="task_started",
+        title=f"Respond to: {user_message}",
+        agent_id=agent_id,
+        tags=["conversation"],
+    )
 
     resp = generate_response(user_message)
 
-    brain.log_event(type="task_completed", title="Responded", details=resp, agent_id=agent_id, tags=["conversation"])
+    brain.log_event(
+        type="task_completed",
+        title="Responded",
+        details=resp,
+        agent_id=agent_id,
+        tags=["conversation"],
+    )
     print(resp)
 
 

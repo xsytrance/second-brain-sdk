@@ -1,13 +1,16 @@
 """Tests for Second Brain SDK core functionality."""
+
 import os
 import tempfile
-import pytest
 from pathlib import Path
-from second_brain.core import Vault, Event, Credential
-from second_brain.session import Session
-from second_brain.query import Query
-from second_brain.credentials import CredentialManager
+
+import pytest
 from cryptography.fernet import Fernet
+
+from second_brain.core import Credential, Event, Vault
+from second_brain.credentials import CredentialManager
+from second_brain.query import Query
+from second_brain.session import Session
 
 
 @pytest.fixture

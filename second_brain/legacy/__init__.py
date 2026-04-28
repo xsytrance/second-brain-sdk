@@ -9,9 +9,9 @@ New code should prefer:
 
 """
 
-from .core import Vault, Event, Credential
+from .core import Credential, Event, Vault
+from .credentials import CredentialManager
 from .query import Query
 from .session import Session
-from .credentials import CredentialManager
 
 __all__ = ["Vault", "Event", "Credential", "Query", "Session", "CredentialManager"]

@@ -142,28 +142,45 @@ class SQLiteStore:
             )
             conn.commit()
 
-    def list_credentials(self, *, service: Optional[str] = None) -> list[dict[str, Any]]:
+    def list_credentials(
+        self, *, service: Optional[str] = None
+    ) -> list[dict[str, Any]]:
         where = ""
         params: list[Any] = []
         if service:
             where = "WHERE service = ?"
             params.append(service)
         with self.connect() as conn:
-            rows = conn.execute(f"SELECT * FROM credentials {where} ORDER BY created_at DESC", params).fetchall()
+            rows = conn.execute(
+                f"SELECT * FROM credentials {where} ORDER BY created_at DESC", params
+            ).fetchall()
         return [dict(r) for r in rows]
 
     def get_credential_row(self, cred_id: str) -> Optional[dict[str, Any]]:
         with self.connect() as conn:
-            row = conn.execute("SELECT * FROM credentials WHERE id = ?", (cred_id,)).fetchone()
+            row = conn.execute(
+                "SELECT * FROM credentials WHERE id = ?", (cred_id,)
+            ).fetchone()
         return dict(row) if row else None
 
     def touch_credential_last_used(self, cred_id: str, ts: str) -> None:
         with self.connect() as conn:
-            conn.execute("UPDATE credentials SET last_used = ? WHERE id = ?", (ts, cred_id))
+            conn.execute(
+                "UPDATE credentials SET last_used = ? WHERE id = ?", (ts, cred_id)
+            )
             conn.commit()
 
     # --- api tokens (server) ---
-    def create_api_token(self, *, token_id: str, created_at: str, agent_id: str, raw_token: str, scopes: list[str], note: Optional[str] = None) -> None:
+    def create_api_token(
+        self,
+        *,
+        token_id: str,
+        created_at: str,
+        agent_id: str,
+        raw_token: str,
+        scopes: list[str],
+        note: Optional[str] = None,
+    ) -> None:
         token_hash = _sha256_hex(raw_token)
         with self.connect() as conn:
             conn.execute(
@@ -171,18 +188,29 @@ class SQLiteStore:
                 INSERT INTO api_tokens(id, created_at, agent_id, token_hash, scopes_json, note)
                 VALUES(?, ?, ?, ?, ?, ?)
                 """,
-                (token_id, created_at, agent_id, token_hash, json.dumps(scopes, ensure_ascii=False), note),
+                (
+                    token_id,
+                    created_at,
+                    agent_id,
+                    token_hash,
+                    json.dumps(scopes, ensure_ascii=False),
+                    note,
+                ),
             )
             conn.commit()
 
-    def list_api_tokens(self, *, agent_id: Optional[str] = None) -> list[dict[str, Any]]:
+    def list_api_tokens(
+        self, *, agent_id: Optional[str] = None
+    ) -> list[dict[str, Any]]:
         where = ""
         params: list[Any] = []
         if agent_id:
             where = "WHERE agent_id = ?"
             params.append(agent_id)
         with self.connect() as conn:
-            rows = conn.execute(f"SELECT * FROM api_tokens {where} ORDER BY created_at DESC", params).fetchall()
+            rows = conn.execute(
+                f"SELECT * FROM api_tokens {where} ORDER BY created_at DESC", params
+            ).fetchall()
         out = []
         for r in rows:
             d = dict(r)
@@ -193,7 +221,9 @@ class SQLiteStore:
 
     def revoke_api_token(self, token_id: str, ts: str) -> None:
         with self.connect() as conn:
-            conn.execute("UPDATE api_tokens SET revoked_at = ? WHERE id = ?", (ts, token_id))
+            conn.execute(
+                "UPDATE api_tokens SET revoked_at = ? WHERE id = ?", (ts, token_id)
+            )
             conn.commit()
 
     def auth_token_lookup(self, raw_token: str) -> Optional[dict[str, Any]]:
@@ -212,5 +242,7 @@ class SQLiteStore:
 
     def touch_token_last_used(self, token_id: str, ts: str) -> None:
         with self.connect() as conn:
-            conn.execute("UPDATE api_tokens SET last_used = ? WHERE id = ?", (ts, token_id))
+            conn.execute(
+                "UPDATE api_tokens SET last_used = ? WHERE id = ?", (ts, token_id)
+            )
             conn.commit()

@@ -1,11 +1,13 @@
 """Session tracking and automatic summarization."""
+
 import json
 import os
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Optional, Dict, Any, List
+from typing import Any, Dict, List, Optional
 from uuid import uuid4
-from .core import Vault, Event
+
+from .core import Event, Vault
 
 
 class Session:
@@ -20,7 +22,10 @@ class Session:
     ):
         self.vault = vault
         self.project = project
-        self.session_id = session_id or f"sess_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}_{os.urandom(3).hex()}"
+        self.session_id = (
+            session_id
+            or f"sess_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}_{os.urandom(3).hex()}"
+        )
         self.start_time = datetime.now(timezone.utc)
         self.auto_summarize = auto_summarize
         self._events: List[Event] = []
@@ -69,8 +74,17 @@ class Session:
         next_steps: Optional[List[str]] = None,
     ):
         """Context manager to log a task with its success/failure."""
+
         class TaskContext:
-            def __init__(self, session: Session, title: str, details: str, files: List[str], tags: List[str], steps: List[str]):
+            def __init__(
+                self,
+                session: Session,
+                title: str,
+                details: str,
+                files: List[str],
+                tags: List[str],
+                steps: List[str],
+            ):
                 self.session = session
                 self.title = title
                 self.details = details
@@ -81,7 +95,9 @@ class Session:
                 self.error_msg: Optional[str] = None
 
             def __enter__(self):
-                self.session.log("task_started", self.title, self.details, tags=self.tags)
+                self.session.log(
+                    "task_started", self.title, self.details, tags=self.tags
+                )
                 return self
 
             def __exit__(self, exc_type, exc_val, exc_tb):
@@ -167,7 +183,9 @@ class Session:
     def _build_summary(self, summary: Optional[str], mins: int, secs: int) -> str:
         """Build the session summary markdown."""
         # Convert Event objects to dicts for sorting
-        events_serialized = [e.to_dict() if hasattr(e, 'to_dict') else e for e in self._events]
+        events_serialized = [
+            e.to_dict() if hasattr(e, "to_dict") else e for e in self._events
+        ]
         events_serialized.sort(key=lambda e: e.get("timestamp", ""))
 
         outcome_counts = {"passed": 0, "failed": 0, "skipped": 0}
@@ -189,9 +207,13 @@ class Session:
 
         lines.append("## Event Log\n")
         for evt in events_serialized:
-            icon = {"passed": "✅", "failed": "❌", "skipped": "⏭️", "session_start": "🚀", "session_end": "🏁"}.get(
-                evt.get("outcome", "passed"), "•"
-            )
+            icon = {
+                "passed": "✅",
+                "failed": "❌",
+                "skipped": "⏭️",
+                "session_start": "🚀",
+                "session_end": "🏁",
+            }.get(evt.get("outcome", "passed"), "•")
             type_label = evt.get("type", "").replace("_", " ").title()
             lines.append(f"{icon} **[{type_label}]** {evt['title']}")
             if evt.get("error"):

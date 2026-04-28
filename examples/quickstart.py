@@ -8,7 +8,12 @@ def main():
     brain = Brain.default()
     brain.init()
 
-    eid = brain.log_event(type="task_started", title="Quickstart event", project="demo", agent_id="example-agent")
+    eid = brain.log_event(
+        type="task_started",
+        title="Quickstart event",
+        project="demo",
+        agent_id="example-agent",
+    )
     print("logged", eid)
 
 

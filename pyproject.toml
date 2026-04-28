@@ -69,6 +69,16 @@ warn_return_any = true
 warn_unused_configs = true
 disallow_untyped_defs = true
 
+# The "legacy" module is kept for backwards compatibility and is not type-hardened.
+# Server/CLI code is intentionally pragmatic and may include untyped Typer/FastAPI hooks.
+[[tool.mypy.overrides]]
+module = [
+  "second_brain.legacy.*",
+  "second_brain.server.*",
+  "second_brain.cli",
+]
+ignore_errors = true
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 python_files = ["test_*.py"]

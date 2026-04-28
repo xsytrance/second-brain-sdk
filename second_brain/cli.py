@@ -24,7 +24,9 @@ from .brain import Brain
 from .storage.sqlite_store import SQLiteStore
 
 console = Console()
-app = typer.Typer(add_completion=False, help="Second Brain — standalone memory for agents")
+app = typer.Typer(
+    add_completion=False, help="Second Brain — standalone memory for agents"
+)
 
 
 def _brain(brain_dir: Optional[Path]) -> Brain:
@@ -33,7 +35,9 @@ def _brain(brain_dir: Optional[Path]) -> Brain:
 
 @app.command()
 def init(
-    brain_dir: Optional[Path] = typer.Option(None, "--brain-dir", envvar="SECOND_BRAIN_DIR"),
+    brain_dir: Optional[Path] = typer.Option(
+        None, "--brain-dir", envvar="SECOND_BRAIN_DIR"
+    ),
 ):
     """Initialize a brain directory (creates SQLite DB + key file)."""
     b = _brain(brain_dir)
@@ -53,7 +57,9 @@ def log(
     tag: List[str] = typer.Option([], "--tag", "-t"),
     session: Optional[str] = typer.Option(None, "--session"),
     agent: Optional[str] = typer.Option(None, "--agent"),
-    brain_dir: Optional[Path] = typer.Option(None, "--brain-dir", envvar="SECOND_BRAIN_DIR"),
+    brain_dir: Optional[Path] = typer.Option(
+        None, "--brain-dir", envvar="SECOND_BRAIN_DIR"
+    ),
 ):
     """Log an event to the SQLite brain."""
     b = _brain(brain_dir)
@@ -77,11 +83,15 @@ def events(
     failed: bool = typer.Option(False, "--failed"),
     limit: int = typer.Option(20, "--limit", "-l"),
     offset: int = typer.Option(0, "--offset"),
-    brain_dir: Optional[Path] = typer.Option(None, "--brain-dir", envvar="SECOND_BRAIN_DIR"),
+    brain_dir: Optional[Path] = typer.Option(
+        None, "--brain-dir", envvar="SECOND_BRAIN_DIR"
+    ),
 ):
     """List events."""
     b = _brain(brain_dir)
-    rows = b.list_events(project=project, agent_id=agent, failed_only=failed, limit=limit, offset=offset)
+    rows = b.list_events(
+        project=project, agent_id=agent, failed_only=failed, limit=limit, offset=offset
+    )
 
     table = Table(title=f"Events ({len(rows)})")
     table.add_column("Time", style="cyan", no_wrap=True)
@@ -116,10 +126,14 @@ def cred_add(
     service: str,
     kind: str,
     context: str,
-    value: str = typer.Option(..., prompt=True, hide_input=True, confirmation_prompt=True),
+    value: str = typer.Option(
+        ..., prompt=True, hide_input=True, confirmation_prompt=True
+    ),
     expires_at: Optional[str] = typer.Option(None, "--expires"),
     rotation_note: Optional[str] = typer.Option(None, "--rotate"),
-    brain_dir: Optional[Path] = typer.Option(None, "--brain-dir", envvar="SECOND_BRAIN_DIR"),
+    brain_dir: Optional[Path] = typer.Option(
+        None, "--brain-dir", envvar="SECOND_BRAIN_DIR"
+    ),
 ):
     b = _brain(brain_dir)
     cid = b.store_credential(
@@ -136,7 +150,9 @@ def cred_add(
 @credential_app.command("list")
 def cred_list(
     service: Optional[str] = typer.Option(None, "--service"),
-    brain_dir: Optional[Path] = typer.Option(None, "--brain-dir", envvar="SECOND_BRAIN_DIR"),
+    brain_dir: Optional[Path] = typer.Option(
+        None, "--brain-dir", envvar="SECOND_BRAIN_DIR"
+    ),
 ):
     b = _brain(brain_dir)
     rows = b.list_credentials(service=service)
@@ -165,7 +181,9 @@ def cred_list(
 @credential_app.command("get")
 def cred_get(
     credential_id: str,
-    brain_dir: Optional[Path] = typer.Option(None, "--brain-dir", envvar="SECOND_BRAIN_DIR"),
+    brain_dir: Optional[Path] = typer.Option(
+        None, "--brain-dir", envvar="SECOND_BRAIN_DIR"
+    ),
 ):
     b = _brain(brain_dir)
     value = b.get_credential(credential_id)
@@ -178,7 +196,9 @@ def cred_get(
 def token_create(
     agent: str = typer.Option(..., "--agent"),
     note: Optional[str] = typer.Option(None, "--note"),
-    brain_dir: Optional[Path] = typer.Option(None, "--brain-dir", envvar="SECOND_BRAIN_DIR"),
+    brain_dir: Optional[Path] = typer.Option(
+        None, "--brain-dir", envvar="SECOND_BRAIN_DIR"
+    ),
 ):
     """Create a write-only agent token (prints token once)."""
     b = _brain(brain_dir)
@@ -197,21 +217,25 @@ def token_create(
         note=note,
     )
 
-    console.print(Panel.fit(
-        f"[bold]Token created[/bold]\n\n"
-        f"id: {token_id}\n"
-        f"agent: {agent}\n"
-        f"scopes: {', '.join(scopes)}\n\n"
-        f"[yellow]SAVE THIS TOKEN NOW[/yellow] (it will not be shown again):\n\n"
-        f"{raw}",
-        title="🧠 Second Brain",
-    ))
+    console.print(
+        Panel.fit(
+            f"[bold]Token created[/bold]\n\n"
+            f"id: {token_id}\n"
+            f"agent: {agent}\n"
+            f"scopes: {', '.join(scopes)}\n\n"
+            f"[yellow]SAVE THIS TOKEN NOW[/yellow] (it will not be shown again):\n\n"
+            f"{raw}",
+            title="🧠 Second Brain",
+        )
+    )
 
 
 @server_app.command("token-list")
 def token_list(
     agent: Optional[str] = typer.Option(None, "--agent"),
-    brain_dir: Optional[Path] = typer.Option(None, "--brain-dir", envvar="SECOND_BRAIN_DIR"),
+    brain_dir: Optional[Path] = typer.Option(
+        None, "--brain-dir", envvar="SECOND_BRAIN_DIR"
+    ),
 ):
     """List tokens (hashes are never shown)."""
     b = _brain(brain_dir)
@@ -242,7 +266,9 @@ def token_list(
 @server_app.command("token-revoke")
 def token_revoke(
     token_id: str,
-    brain_dir: Optional[Path] = typer.Option(None, "--brain-dir", envvar="SECOND_BRAIN_DIR"),
+    brain_dir: Optional[Path] = typer.Option(
+        None, "--brain-dir", envvar="SECOND_BRAIN_DIR"
+    ),
 ):
     b = _brain(brain_dir)
     b.init()
@@ -255,14 +281,19 @@ def token_revoke(
 def serve(
     host: str = typer.Option("127.0.0.1", "--host"),
     port: int = typer.Option(8009, "--port"),
-    brain_dir: Optional[Path] = typer.Option(None, "--brain-dir", envvar="SECOND_BRAIN_DIR"),
+    brain_dir: Optional[Path] = typer.Option(
+        None, "--brain-dir", envvar="SECOND_BRAIN_DIR"
+    ),
 ):
     """Run the optional FastAPI server (requires `pip install second-brain[server]`)."""
     try:
         import uvicorn
+
         from .server import create_app
     except Exception as e:
-        console.print("[red]Server extra not installed.[/red] Run: `pip install second-brain[server]`")
+        console.print(
+            "[red]Server extra not installed.[/red] Run: `pip install second-brain[server]`"
+        )
         raise typer.Exit(code=1)
 
     b = _brain(brain_dir)
