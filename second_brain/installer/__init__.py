@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import os
 import subprocess
+import sys
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
@@ -179,11 +180,22 @@ class Installer:
 
     def install_sdk(self) -> int:
         print("\n=== Install SDK ===")
-        pip = self.venv_bin / "pip"
+        # Resolve pip binary: prefer 'pip', fall back to pip3 / pip3.x
+        pip_candidates = ["pip", "pip3", f"pip{sys.version_info.major}.{sys.version_info.minor}"]
+        pip_bin = None
+        for candidate in pip_candidates:
+            candidate_path = self.venv_bin / candidate
+            if candidate_path.exists():
+                pip_bin = candidate_path
+                break
+        if pip_bin is None:
+            print(f"[FAIL] No pip binary found in {self.venv_bin}. Tried: {pip_candidates}")
+            return 1
+
         try:
-            subprocess.run([str(pip), "install", "--upgrade", "pip"], capture_output=True, check=True)
+            subprocess.run([str(pip_bin), "install", "--upgrade", "pip"], capture_output=True, check=True)
             extra = "[server]" if self.server_mode else ""
-            subprocess.run([str(pip), "install", "-e", str(self.repo_dir) + extra], capture_output=True, check=True)
+            subprocess.run([str(pip_bin), "install", "-e", str(self.repo_dir) + extra], capture_output=True, check=True)
             print("[OK] Second Brain installed")
             return 0
         except subprocess.CalledProcessError as e:
