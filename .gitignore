@@ -52,3 +52,9 @@ Thumbs.db
 venv/
 env/
 .venv
+
+# build artifacts
+/dist/
+/dist_wheel/
+*.whl
+*.tar.gz
