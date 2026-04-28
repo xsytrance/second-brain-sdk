@@ -1,0 +1,14 @@
+[Unit]
+Description=Second Brain Server (write-only HTTP API)
+After=network.target
+
+[Service]
+Type=simple
+User=%i
+Environment="SECOND_BRAIN_DIR=%h/.second-brain"
+ExecStart=/usr/bin/env second-brain server serve --host 127.0.0.1 --port 8009
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=default.target

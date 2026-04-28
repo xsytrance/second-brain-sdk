@@ -347,5 +347,63 @@ def session_list(
     console.print(table)
 
 
+@app.command("prune")
+def prune(
+    days: int = typer.Option(90, "--days", "-d", help="Delete events older than N days"),
+    dry_run: bool = typer.Option(False, "--dry-run", help="Show what would be deleted"),
+    brain_dir: Optional[Path] = typer.Option(None, "--brain-dir", envvar="SECOND_BRAIN_DIR"),
+):
+    """Delete old events and sessions (retention policy)."""
+    from second_brain import Brain
+    b = Brain(brain_dir) if brain_dir else Brain.default()
+    b.init()
+    from datetime import datetime, timezone
+    cutoff = datetime.now(timezone.utc).replace(day=datetime.now().day - days)
+    cutoff_iso = cutoff.isoformat()
+    store = b._store()
+    with store.connect() as conn:
+        evt = conn.execute("SELECT COUNT(*) FROM events WHERE ts < ?", (cutoff_iso,)).fetchone()[0]
+        sess = conn.execute("SELECT COUNT(*) FROM sessions WHERE started_at < ?", (cutoff_iso,)).fetchone()[0]
+        if dry_run:
+            console.print(f"[yellow]Would delete:[/yellow] {evt} events, {sess} sessions older than {days} days")
+            return
+        if evt == 0 and sess == 0:
+            console.print("[green]✓ Nothing to delete — retention policy satisfied.[/green]")
+            return
+        conn.execute("DELETE FROM events WHERE ts < ?", (cutoff_iso,))
+        conn.execute("DELETE FROM sessions WHERE started_at < ?", (cutoff_iso,))
+        conn.commit()
+        console.print(f"[green]✓ Deleted:[/green] {evt} events, {sess} sessions")
+
+@app.command("status")
+def status(
+    brain_dir: Optional[Path] = typer.Option(None, "--brain-dir", envvar="SECOND_BRAIN_DIR"),
+):
+    """Show brain health, size, and statistics."""
+    from second_brain import Brain
+    import os
+    b = Brain(brain_dir) if brain_dir else Brain.default()
+    b.init()
+    store = b._store()
+    db_size = os.path.getsize(b.db_path)
+    key_size = os.path.getsize(b.key_path) if b.key_path.exists() else 0
+    with store.connect() as conn:
+        evt = conn.execute("SELECT COUNT(*) FROM events").fetchone()[0]
+        sess = conn.execute("SELECT COUNT(*) FROM sessions").fetchone()[0]
+        cred = conn.execute("SELECT COUNT(*) FROM credentials").fetchone()[0]
+        tok = conn.execute("SELECT COUNT(*) FROM api_tokens").fetchone()[0]
+        last = conn.execute("SELECT MAX(ts) FROM events").fetchone()[0]
+    table = Table(title="Second Brain Status")
+    table.add_column("Metric"); table.add_column("Value", style="green")
+    table.add_row("DB size", f"{db_size/1024:.1f} KB")
+    table.add_row("Key size", f"{key_size} B")
+    table.add_row("Total events", str(evt))
+    table.add_row("Total sessions", str(sess))
+    table.add_row("Credentials", str(cred))
+    table.add_row("API tokens", str(tok))
+    table.add_row("Last event", last or "never")
+    console.print(table)
+
+
 if __name__ == "__main__":
     app()
