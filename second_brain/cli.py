@@ -11,6 +11,7 @@ Current state (as of v0.1.x):
 from __future__ import annotations
 
 import secrets
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import List, Optional
 
@@ -20,6 +21,7 @@ from rich.panel import Panel
 from rich.table import Table
 
 from .brain import Brain
+from .storage.sqlite_store import SQLiteStore
 
 console = Console()
 app = typer.Typer(add_completion=False, help="Second Brain — standalone memory for agents")
@@ -105,6 +107,9 @@ def events(
 credential_app = typer.Typer(help="Manage encrypted credentials")
 app.add_typer(credential_app, name="credential")
 
+server_app = typer.Typer(help="Server mode (optional)")
+app.add_typer(server_app, name="server")
+
 
 @credential_app.command("add")
 def cred_add(
@@ -167,6 +172,103 @@ def cred_get(
     if value is None:
         raise typer.Exit(code=1)
     console.print(Panel(value, title=f"🔐 {credential_id}", border_style="green"))
+
+
+@server_app.command("token-create")
+def token_create(
+    agent: str = typer.Option(..., "--agent"),
+    note: Optional[str] = typer.Option(None, "--note"),
+    brain_dir: Optional[Path] = typer.Option(None, "--brain-dir", envvar="SECOND_BRAIN_DIR"),
+):
+    """Create a write-only agent token (prints token once)."""
+    b = _brain(brain_dir)
+    b.init()
+    store = SQLiteStore(b.db_path)
+
+    token_id = f"tok_{secrets.token_hex(6)}"
+    raw = secrets.token_urlsafe(32)
+    scopes = ["events:write"]
+    store.create_api_token(
+        token_id=token_id,
+        created_at=datetime.now(timezone.utc).isoformat(),
+        agent_id=agent,
+        raw_token=raw,
+        scopes=scopes,
+        note=note,
+    )
+
+    console.print(Panel.fit(
+        f"[bold]Token created[/bold]\n\n"
+        f"id: {token_id}\n"
+        f"agent: {agent}\n"
+        f"scopes: {', '.join(scopes)}\n\n"
+        f"[yellow]SAVE THIS TOKEN NOW[/yellow] (it will not be shown again):\n\n"
+        f"{raw}",
+        title="🧠 Second Brain",
+    ))
+
+
+@server_app.command("token-list")
+def token_list(
+    agent: Optional[str] = typer.Option(None, "--agent"),
+    brain_dir: Optional[Path] = typer.Option(None, "--brain-dir", envvar="SECOND_BRAIN_DIR"),
+):
+    """List tokens (hashes are never shown)."""
+    b = _brain(brain_dir)
+    b.init()
+    store = SQLiteStore(b.db_path)
+    rows = store.list_api_tokens(agent_id=agent)
+
+    table = Table(title=f"API Tokens ({len(rows)})")
+    table.add_column("ID", style="cyan", no_wrap=True)
+    table.add_column("Agent", style="magenta")
+    table.add_column("Scopes", style="white")
+    table.add_column("Created", style="cyan", no_wrap=True)
+    table.add_column("Last Used", style="cyan", no_wrap=True)
+    table.add_column("Revoked", style="red", no_wrap=True)
+
+    for r in rows:
+        table.add_row(
+            r.get("id", ""),
+            r.get("agent_id", ""),
+            ",".join(r.get("scopes") or []),
+            (r.get("created_at", "") or "")[:10],
+            (r.get("last_used", "") or "")[:10],
+            "yes" if r.get("revoked_at") else "",
+        )
+    console.print(table)
+
+
+@server_app.command("token-revoke")
+def token_revoke(
+    token_id: str,
+    brain_dir: Optional[Path] = typer.Option(None, "--brain-dir", envvar="SECOND_BRAIN_DIR"),
+):
+    b = _brain(brain_dir)
+    b.init()
+    store = SQLiteStore(b.db_path)
+    store.revoke_api_token(token_id, datetime.now(timezone.utc).isoformat())
+    console.print(f"[green][/green] Revoked {token_id}")
+
+
+@server_app.command("serve")
+def serve(
+    host: str = typer.Option("127.0.0.1", "--host"),
+    port: int = typer.Option(8009, "--port"),
+    brain_dir: Optional[Path] = typer.Option(None, "--brain-dir", envvar="SECOND_BRAIN_DIR"),
+):
+    """Run the optional FastAPI server (requires `pip install second-brain[server]`)."""
+    try:
+        import uvicorn
+        from .server import create_app
+    except Exception as e:
+        console.print("[red]Server extra not installed.[/red] Run: `pip install second-brain[server]`")
+        raise typer.Exit(code=1)
+
+    b = _brain(brain_dir)
+    b.init()
+    app_ = create_app(b)
+    uvicorn.run(app_, host=host, port=port, log_level="info")
 
 
 if __name__ == "__main__":

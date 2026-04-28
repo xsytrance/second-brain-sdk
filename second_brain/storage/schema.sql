@@ -49,3 +49,18 @@ CREATE TABLE IF NOT EXISTS credentials (
 
 CREATE INDEX IF NOT EXISTS idx_creds_service ON credentials(service);
 CREATE INDEX IF NOT EXISTS idx_creds_kind ON credentials(kind);
+
+-- API tokens for server mode (write-only agents)
+CREATE TABLE IF NOT EXISTS api_tokens (
+  id TEXT PRIMARY KEY,
+  created_at TEXT NOT NULL,
+  agent_id TEXT NOT NULL,
+  token_hash TEXT NOT NULL,
+  scopes_json TEXT NOT NULL DEFAULT '["events:write"]',
+  revoked_at TEXT,
+  last_used TEXT,
+  note TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_tokens_agent ON api_tokens(agent_id);
+CREATE INDEX IF NOT EXISTS idx_tokens_hash ON api_tokens(token_hash);

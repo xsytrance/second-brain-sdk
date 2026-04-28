@@ -1,15 +1,19 @@
 from __future__ import annotations
 
+import hashlib
 import json
-import os
 import sqlite3
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Iterable, Optional
+from typing import Any, Optional
 
 
 def _read_text(path: Path) -> str:
     return path.read_text(encoding="utf-8")
+
+
+def _sha256_hex(value: str) -> str:
+    return hashlib.sha256(value.encode("utf-8")).hexdigest()
 
 
 @dataclass
@@ -42,7 +46,11 @@ class SQLiteStore:
             conn.executescript(ddl)
             # set schema version if missing
             conn.execute(
-                "INSERT OR IGNORE INTO meta(key, value) VALUES('schema_version', '1')"
+                "INSERT OR IGNORE INTO meta(key, value) VALUES('schema_version', '2')"
+            )
+            # If upgrading an older DB, bump version.
+            conn.execute(
+                "UPDATE meta SET value = '2' WHERE key = 'schema_version' AND CAST(value AS INTEGER) < 2"
             )
             conn.commit()
 
@@ -152,4 +160,57 @@ class SQLiteStore:
     def touch_credential_last_used(self, cred_id: str, ts: str) -> None:
         with self.connect() as conn:
             conn.execute("UPDATE credentials SET last_used = ? WHERE id = ?", (ts, cred_id))
+            conn.commit()
+
+    # --- api tokens (server) ---
+    def create_api_token(self, *, token_id: str, created_at: str, agent_id: str, raw_token: str, scopes: list[str], note: Optional[str] = None) -> None:
+        token_hash = _sha256_hex(raw_token)
+        with self.connect() as conn:
+            conn.execute(
+                """
+                INSERT INTO api_tokens(id, created_at, agent_id, token_hash, scopes_json, note)
+                VALUES(?, ?, ?, ?, ?, ?)
+                """,
+                (token_id, created_at, agent_id, token_hash, json.dumps(scopes, ensure_ascii=False), note),
+            )
+            conn.commit()
+
+    def list_api_tokens(self, *, agent_id: Optional[str] = None) -> list[dict[str, Any]]:
+        where = ""
+        params: list[Any] = []
+        if agent_id:
+            where = "WHERE agent_id = ?"
+            params.append(agent_id)
+        with self.connect() as conn:
+            rows = conn.execute(f"SELECT * FROM api_tokens {where} ORDER BY created_at DESC", params).fetchall()
+        out = []
+        for r in rows:
+            d = dict(r)
+            d["scopes"] = json.loads(d.get("scopes_json") or "[]")
+            d.pop("scopes_json", None)
+            out.append(d)
+        return out
+
+    def revoke_api_token(self, token_id: str, ts: str) -> None:
+        with self.connect() as conn:
+            conn.execute("UPDATE api_tokens SET revoked_at = ? WHERE id = ?", (ts, token_id))
+            conn.commit()
+
+    def auth_token_lookup(self, raw_token: str) -> Optional[dict[str, Any]]:
+        token_hash = _sha256_hex(raw_token)
+        with self.connect() as conn:
+            row = conn.execute(
+                "SELECT * FROM api_tokens WHERE token_hash = ? AND revoked_at IS NULL",
+                (token_hash,),
+            ).fetchone()
+        if not row:
+            return None
+        d = dict(row)
+        d["scopes"] = json.loads(d.get("scopes_json") or "[]")
+        d.pop("scopes_json", None)
+        return d
+
+    def touch_token_last_used(self, token_id: str, ts: str) -> None:
+        with self.connect() as conn:
+            conn.execute("UPDATE api_tokens SET last_used = ? WHERE id = ?", (ts, token_id))
             conn.commit()
