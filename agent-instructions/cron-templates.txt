@@ -1,0 +1,15 @@
+# SECOND BRAIN - CRON JOB TEMPLATES
+# Install with: crontab -e
+
+# Health check every 5 minutes
+*/5 * * * * /home/xsyprime/second-brain-sdk/agent-instructions/diagnostic.py --ci || echo "SB down" | mail -s "[ALERT]" agenor@outlook.com
+
+# Retention prune (monthly, keep 90 days)
+0 3 1 * * /home/xsyprime/.venvs/second-brain/bin/second-brain prune --days 90
+
+# Backup to VPS (PRIME only)
+0 2 * * * scp ~/.second-brain/brain.db xsyvps@vps:/home/xsyvps/backups/$(hostname)_brain_$(date +%Y%m%d).db
+0 3 * * * scp ~/.second-brain/brain.key xsyvps@vps:/home/xsyvps/backups/$(hostname)_key_$(date +%Y%m%d).key
+
+# Heartbeat (client nodes)
+*/10 * * * * curl -s -X POST "$SECOND_BRAIN_SERVER_URL/v1/events" -H "Authorization: Bearer $SECOND_BRAIN_TOKEN" -d '{"type":"heartbeat","title":"$(hostname) alive","project":"vg-clan"}' >/dev/null

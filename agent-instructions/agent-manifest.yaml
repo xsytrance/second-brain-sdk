@@ -1,0 +1,25 @@
+# Agent Manifest - Second Brain Deployment Inventory
+node_name: CHANGE_ME
+hostname: CHANGE_ME
+vg_role: [prime|venus|pluto|vps|worker]
+installation_date: YYYY-MM-DD
+mode: [local|server|client]
+venv_path: ~/.venvs/second-brain
+brain_dir: ~/.second-brain
+install_method: [bootstrap|manual|script]
+commit_sha: CHANGE_ME
+server_url: http://127.0.0.1:8009
+token_id: tok_XXXXX
+token_created: YYYY-MM-DD
+token_scopes: [events:write]
+systemd_user_service: [yes|no]
+systemd_enabled: [yes|no]
+linger_enabled: [yes|no]
+backup_enabled: [yes|no]
+backup_destination: xsyvps@vps:/home/xsyvps/backups/
+backup_schedule: "0 2 * * *"
+health_check_enabled: [yes|no]
+health_check_schedule: "*/5 * * * *"
+alert_email: agenor@outlook.com
+owner: xsytrance
+notes: |
