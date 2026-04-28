@@ -355,6 +355,7 @@ def prune(
 ):
     """Delete old events and sessions (retention policy)."""
     from second_brain import Brain
+from second_brain.installer import install as cli_install
     b = Brain(brain_dir) if brain_dir else Brain.default()
     b.init()
     from datetime import datetime, timezone
@@ -381,6 +382,7 @@ def status(
 ):
     """Show brain health, size, and statistics."""
     from second_brain import Brain
+from second_brain.installer import install as cli_install
     import os
     b = Brain(brain_dir) if brain_dir else Brain.default()
     b.init()
@@ -403,6 +405,19 @@ def status(
     table.add_row("API tokens", str(tok))
     table.add_row("Last event", last or "never")
     console.print(table)
+
+
+@app.command("install")
+def install_command(
+    server: bool = typer.Option(False, "--server", "-s", help="Install server mode (write-only HTTP API)"),
+    token_for: Optional[str] = typer.Option(None, "--token-for", help="Create token for specified agent (server mode only)"),
+    brain_dir: Optional[Path] = typer.Option(None, "--brain-dir", envvar="SECOND_BRAIN_DIR"),
+):
+    """Autonomous self-install: detect agent, set up brain, configure integration."""
+    import os
+    if brain_dir:
+        os.environ["SECOND_BRAIN_DIR"] = str(brain_dir)
+    sys.exit(cli_install(server_mode=server, token_for=token_for))
 
 
 if __name__ == "__main__":
