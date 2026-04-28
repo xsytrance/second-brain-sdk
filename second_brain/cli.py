@@ -302,5 +302,50 @@ def serve(
     uvicorn.run(app_, host=host, port=port, log_level="info")
 
 
+@app.command("session-start")
+def session_start(
+    agent: Optional[str] = typer.Option(None, "--agent", "-a"),
+    project: Optional[str] = typer.Option(None, "--project", "-p"),
+    brain_dir: Optional[Path] = typer.Option(None, "--brain-dir", envvar="SECOND_BRAIN_DIR"),
+):
+    """Start a new session and print its ID."""
+    b = Brain(brain_dir) if brain_dir else Brain.default()
+    sid = b.start_session(agent_id=agent, project=project)
+    console.print(f"[bold green]Session started:[/bold green] {sid}")
+
+@app.command("session-end")
+def session_end(
+    session_id: str = typer.Argument(...),
+    outcome: str = typer.Option("passed", "--outcome", "-o"),
+    details: Optional[str] = typer.Option(None, "--details", "-d"),
+    brain_dir: Optional[Path] = typer.Option(None, "--brain-dir", envvar="SECOND_BRAIN_DIR"),
+):
+    """End an existing session."""
+    b = Brain(brain_dir) if brain_dir else Brain.default()
+    b.end_session(session_id, outcome=outcome, details=details)
+    console.print(f"[bold green]Session ended:[/bold green] {session_id}")
+
+@app.command("session-list")
+def session_list(
+    brain_dir: Optional[Path] = typer.Option(None, "--brain-dir", envvar="SECOND_BRAIN_DIR"),
+    limit: int = typer.Option(20, "--limit", "-n"),
+):
+    """List recent sessions."""
+    b = Brain(brain_dir) if brain_dir else Brain.default()
+    rows = b._store().conn.execute(
+        "SELECT id, started_at, ended_at, agent_id, project FROM sessions ORDER BY started_at DESC LIMIT ?",
+        (limit,)
+    ).fetchall()
+    if not rows:
+        console.print("[dim]No sessions found.[/dim]")
+        return
+    table = Table(title="Sessions")
+    table.add_column("ID", style="cyan"); table.add_column("Started", style="green")
+    table.add_column("Ended", style="yellow"); table.add_column("Agent"); table.add_column("Project")
+    for r in rows:
+        table.add_row(r["id"], r["started_at"], r["ended_at"] or "", r["agent_id"] or "", r["project"] or "")
+    console.print(table)
+
+
 if __name__ == "__main__":
     app()

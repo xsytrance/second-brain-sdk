@@ -1,4 +1,5 @@
 from __future__ import annotations
+from contextlib import contextmanager
 
 import os
 from dataclasses import dataclass
@@ -88,6 +89,60 @@ class Brain:
         }
         self._store().insert_event(row)
         return eid
+
+    # ---- sessions ----
+    def start_session(
+        self,
+        agent_id: Optional[str] = None,
+        project: Optional[str] = None,
+    ) -> str:
+        """Create a new session and log a ``session_started`` event. Returns session_id."""
+        self.init()
+        session_id = f"sess_{uuid4().hex[:12]}"
+        now = _now()
+        with self._store().connect() as conn:
+            conn.execute(
+                "INSERT INTO sessions(id, started_at, agent_id, project) VALUES(?, ?, ?, ?)",
+                (session_id, now, agent_id, project),
+            )
+            conn.commit()
+        self.log_event(
+            type="session_started",
+            title=f"Session started — project={project or 'unnamed'}",
+            project=project,
+            agent_id=agent_id,
+            meta={"session_id": session_id},
+        )
+        return session_id
+
+    def end_session(self, session_id: str, outcome: str = "passed", details: Optional[str] = None) -> None:
+        """Mark a session as ended and log a ``session_ended`` event."""
+        self.init()
+        now = _now()
+        with self._store().connect() as conn:
+            conn.execute(
+                "UPDATE sessions SET ended_at = ? WHERE id = ?",
+                (now, session_id),
+            )
+            conn.commit()
+        self.log_event(
+            type="session_ended",
+            title="Session ended",
+            details=details,
+            outcome=outcome,
+            meta={"session_id": session_id},
+        )
+
+    @contextmanager
+    def session(self, agent_id: Optional[str] = None, project: Optional[str] = None):
+        """Context manager: creates a session and auto-ends it on exit."""
+        sid = self.start_session(agent_id=agent_id, project=project)
+        try:
+            yield sid
+            self.end_session(sid, outcome="passed")
+        except Exception as e:
+            self.end_session(sid, outcome="failed", details=str(e))
+            raise
 
     def list_events(
         self,

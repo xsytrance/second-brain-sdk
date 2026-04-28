@@ -27,7 +27,7 @@ CREATE TABLE IF NOT EXISTS events (
   session_id TEXT,
   agent_id TEXT,
   meta_json TEXT NOT NULL DEFAULT '{}',
-  FOREIGN KEY(session_id) REFERENCES sessions(id)
+  FOREIGN KEY(session_id) REFERENCES sessions(id) DEFERRABLE INITIALLY DEFERRED
 );
 
 CREATE INDEX IF NOT EXISTS idx_events_ts ON events(ts);

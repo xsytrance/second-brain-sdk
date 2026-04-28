@@ -126,5 +126,12 @@ New projects should use `Brain`.
 
 ---
 
+## Documentation
+
+- [Installation Guide](docs/INSTALL.md)
+- [Agent Integration](docs/INTEGRATION.md)
+- [Troubleshooting](docs/TROUBLESHOOTING.md)
+- [Server Mode](docs/SERVER.md) (write-only HTTP API)
+
 ## License
 MIT
