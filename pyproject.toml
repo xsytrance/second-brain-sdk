@@ -53,6 +53,9 @@ second-brain = "second_brain.cli:app"
 where = ["."]
 include = ["second_brain*"]
 
+[tool.setuptools]
+include-package-data = true
+
 [tool.black]
 line-length = 88
 target-version = ["py39"]
