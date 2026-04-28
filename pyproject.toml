@@ -8,7 +8,7 @@ version = "0.1.0"
 description = "Event-sourced knowledge base and encrypted credential vault for AI agents"
 readme = "README.md"
 requires-python = ">=3.9"
-license = {text = "MIT"}
+license = "MIT"
 authors = [
     {name = "Hermes Agent", email = "hermes@nousresearch.com"}
 ]
@@ -16,7 +16,6 @@ keywords = ["ai-agent", "knowledge-base", "encryption", "event-sourcing", "loggi
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
-    "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
