@@ -1,10 +1,12 @@
 """Core vault management with Fernet encryption."""
+
 import json
 import os
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 from uuid import uuid4
+
 from cryptography.fernet import Fernet, InvalidToken
 
 
@@ -102,7 +104,9 @@ class Vault:
 
     def __init__(self, path: str, key_path: Optional[str] = None):
         self.path = Path(path)
-        self.key_path = Path(key_path) if key_path else self.path.parent / "decryption_key.key"
+        self.key_path = (
+            Path(key_path) if key_path else self.path.parent / "decryption_key.key"
+        )
         self._fernet: Optional[Fernet] = None
         self._data: Dict[str, Any] = {
             "version": "1.0",
@@ -245,7 +249,9 @@ class Vault:
             if cred_dict["id"] == cred_id:
                 fernet = self._get_fernet()
                 try:
-                    return fernet.decrypt(cred_dict["encrypted_value"].encode()).decode()
+                    return fernet.decrypt(
+                        cred_dict["encrypted_value"].encode()
+                    ).decode()
                 except InvalidToken:
                     return None
         return None
@@ -319,7 +325,9 @@ class Vault:
         ]
 
         for evt in sorted(events, key=lambda e: e["timestamp"]):
-            icon = {"passed": "✅", "failed": "❌", "skipped": "⏭️"}.get(evt["outcome"], "•")
+            icon = {"passed": "✅", "failed": "❌", "skipped": "⏭️"}.get(
+                evt["outcome"], "•"
+            )
             lines.append(f"{icon} **{evt['title']}** — {evt['outcome']}")
             if evt.get("error"):
                 lines.append(f"   > Error: {evt['error']}")

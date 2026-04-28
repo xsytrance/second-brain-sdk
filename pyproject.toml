@@ -3,12 +3,12 @@ requires = ["setuptools>=61.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "second-brain-sdk"
-version = "1.0.0"
+name = "second-brain"
+version = "0.1.0"
 description = "Event-sourced knowledge base and encrypted credential vault for AI agents"
 readme = "README.md"
 requires-python = ">=3.9"
-license = {text = "MIT"}
+license = "MIT"
 authors = [
     {name = "Hermes Agent", email = "hermes@nousresearch.com"}
 ]
@@ -16,7 +16,6 @@ keywords = ["ai-agent", "knowledge-base", "encryption", "event-sourcing", "loggi
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
-    "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
@@ -25,13 +24,18 @@ classifiers = [
 ]
 dependencies = [
     "cryptography>=3.4.0",
-    "pyyaml>=5.4",
-    "click>=8.0.0",
+    "pydantic>=2.6.0",
+    "typer>=0.12.0",
     "rich>=12.0.0",
     "python-dateutil>=2.8.2",
 ]
 
 [project.optional-dependencies]
+server = [
+    "fastapi>=0.110.0",
+    "uvicorn>=0.27.0",
+]
+
 dev = [
     "pytest>=7.0.0",
     "pytest-cov>=4.0.0",
@@ -42,11 +46,14 @@ dev = [
 ]
 
 [project.scripts]
-second-brain = "second_brain_sdk.cli:main"
+second-brain = "second_brain.cli:app"
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["second_brain_sdk*"]
+include = ["second_brain*"]
+
+[tool.setuptools]
+include-package-data = true
 
 [tool.black]
 line-length = 88
@@ -61,6 +68,16 @@ python_version = "3.9"
 warn_return_any = true
 warn_unused_configs = true
 disallow_untyped_defs = true
+
+# The "legacy" module is kept for backwards compatibility and is not type-hardened.
+# Server/CLI code is intentionally pragmatic and may include untyped Typer/FastAPI hooks.
+[[tool.mypy.overrides]]
+module = [
+  "second_brain.legacy.*",
+  "second_brain.server.*",
+  "second_brain.cli",
+]
+ignore_errors = true
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

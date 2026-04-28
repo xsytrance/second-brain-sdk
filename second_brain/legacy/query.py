@@ -1,6 +1,8 @@
 """Query interface for filtering and searching vault events."""
-from typing import Optional, List, Dict, Any
+
 from datetime import datetime
+from typing import Any, Dict, List, Optional
+
 from .core import Vault
 
 
@@ -100,6 +102,7 @@ class Query:
     def recent_failures(cls, vault: Vault, hours: int = 24) -> List[Dict[str, Any]]:
         """Get failures from last N hours."""
         from datetime import datetime, timedelta, timezone
+
         cutoff = (datetime.now(timezone.utc) - timedelta(hours=hours)).isoformat()
         return Query(vault).outcome("failed").since(cutoff).all()
 
