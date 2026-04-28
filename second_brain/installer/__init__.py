@@ -13,8 +13,10 @@ Features:
 from __future__ import annotations
 
 import os
+import shutil
 import subprocess
 import sys
+import time
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
@@ -83,11 +85,14 @@ class Installer:
         server_mode: bool = False,
         token_for: Optional[str] = None,
         repo_path: Optional[Path] = None,
+        reset: bool = False,
     ):
         self.p = profile
         self.server_mode = server_mode
         self.token_for = token_for
         self.requested_repo_path = repo_path
+        self.reset_requested = reset
+        self.noop_current = False
 
     def run(self) -> int:
         """Execute all installation steps. Returns exit code."""
@@ -95,6 +100,7 @@ class Installer:
             self.check_prereqs,
             self.setup_venv,
             self.clone_repo,
+            self.evaluate_existing_install,
             self.install_sdk,
             self.init_brain,
             self.configure_hermes_plugin,
@@ -106,6 +112,8 @@ class Installer:
             rc = step()
             if rc != 0:
                 return rc
+            if self.noop_current:
+                return 0
 
         return 0
 
@@ -207,6 +215,106 @@ class Installer:
         except subprocess.CalledProcessError as e:
             print(f"[FAIL] Clone failed: {e.stderr.decode()}")
             return 1
+
+    def _repo_version(self) -> Optional[str]:
+        pyproject = self.repo_dir / "pyproject.toml"
+        if not pyproject.exists():
+            return None
+        try:
+            if sys.version_info >= (3, 11):
+                import tomllib
+
+                data = tomllib.loads(pyproject.read_text())
+                return str(data.get("project", {}).get("version") or "") or None
+            for line in pyproject.read_text().splitlines():
+                if line.strip().startswith("version") and "=" in line:
+                    return line.split("=", 1)[1].strip().strip('"\'')
+        except Exception:
+            return None
+        return None
+
+    def _installed_version(self) -> Optional[str]:
+        python = self.venv_bin / "python"
+        if not python.exists():
+            return None
+        code = """
+from importlib.metadata import PackageNotFoundError, version
+for name in ('second-brain', 'second_brain'):
+    try:
+        print(version(name))
+        raise SystemExit(0)
+    except PackageNotFoundError:
+        pass
+raise SystemExit(1)
+""".strip()
+        result = subprocess.run([str(python), "-c", code], capture_output=True, text=True)
+        if result.returncode == 0:
+            return result.stdout.strip().splitlines()[-1]
+        return None
+
+    @staticmethod
+    def _version_key(value: Optional[str]) -> tuple:
+        if not value:
+            return ()
+        parts = []
+        for piece in value.replace("-", ".").split("."):
+            digits = "".join(ch for ch in piece if ch.isdigit())
+            if digits:
+                parts.append(int(digits))
+            else:
+                parts.append(piece)
+        return tuple(parts)
+
+    def _backup_and_reset_brain(self) -> int:
+        print("\n=== Reset Existing Brain ===")
+        if not self.p.brain_dir.exists():
+            print(f"[OK] No existing brain directory to reset: {self.p.brain_dir}")
+            return 0
+        backup = self.p.brain_dir.parent / f".second-brain.reset-backup.{time.strftime('%Y%m%d_%H%M%S')}"
+        try:
+            shutil.copytree(self.p.brain_dir, backup)
+            shutil.rmtree(self.p.brain_dir)
+            print(f"[OK] Existing brain backed up to {backup}")
+            print(f"[OK] Reset removed active brain directory: {self.p.brain_dir}")
+            return 0
+        except Exception as e:
+            print(f"[FAIL] Reset failed: {e}")
+            return 1
+
+    def evaluate_existing_install(self) -> int:
+        print("\n=== Existing Installation ===")
+        repo_version = self._repo_version()
+        installed_version = self._installed_version()
+        print(f"Repo version     : {repo_version or 'unknown'}")
+        print(f"Installed version: {installed_version or 'not installed'}")
+
+        if installed_version is None:
+            print("[OK] No existing install detected; fresh install will proceed")
+            return 0
+
+        if repo_version and self._version_key(installed_version) < self._version_key(repo_version):
+            print(f"[OK] Older install detected ({installed_version} < {repo_version}); upgrade will proceed")
+            return 0
+
+        if repo_version and self._version_key(installed_version) > self._version_key(repo_version):
+            print(f"[WARN] Installed version ({installed_version}) is newer than repo ({repo_version}); reinstall from supplied repo will proceed")
+            return 0
+
+        if not self.p.brain_dir.exists():
+            print("[OK] Package is current but brain state is missing; initialization will proceed")
+            return 0
+
+        if self.reset_requested:
+            return self._backup_and_reset_brain()
+
+        if sys.stdin.isatty():
+            answer = input("Second Brain is already current. Reset local brain state? [y/N]: ").strip().lower()
+            if answer in {"y", "yes"}:
+                return self._backup_and_reset_brain()
+
+        print("[OK] Already current; no changes will be made. To reset, rerun with --reset.")
+        self.noop_current = True
+        return 0
 
     def install_sdk(self) -> int:
         print("\n=== Install SDK ===")
@@ -356,6 +464,7 @@ def install(
     server_mode: bool = False,
     token_for: Optional[str] = None,
     repo_path: Optional[str] = None,
+    reset: bool = False,
 ) -> int:
     """CLI entry: second-brain install [REPO_PATH] [--server] [--token-for AGENT]"""
     print("\n" + "="*60)
@@ -367,16 +476,28 @@ def install(
     print(f"Home dir   : {profile.home}")
     print(f"Brain dir  : {profile.brain_dir}")
     print(f"Server mode: {server_mode}")
+    print(f"Reset mode : {reset}")
     repo = Path(repo_path).expanduser().resolve() if repo_path else None
     if repo is not None:
         print(f"Repo path  : {repo}")
     print()
 
-    installer = Installer(profile, server_mode=server_mode, token_for=token_for, repo_path=repo)
+    installer = Installer(
+        profile,
+        server_mode=server_mode,
+        token_for=token_for,
+        repo_path=repo,
+        reset=reset,
+    )
     rc = installer.run()
 
     if rc == 0:
         print("\n" + "="*60)
+        if installer.noop_current:
+            print("  SECOND BRAIN ALREADY CURRENT — NO CHANGES MADE")
+            print("="*60)
+            print("  • To reset after explicit user approval, rerun with --reset")
+            return rc
         print("  INSTALLATION COMPLETE — NEXT STEPS")
         print("="*60)
         if profile.type == AgentType.HERMES:
@@ -545,7 +666,7 @@ def wizard() -> int:
         token_for = None
         if server:
             token_for = input("Token for agent name (blank for hostname): ").strip() or None
-        return install(server_mode=server, token_for=token_for)
+        return install(server_mode=server, token_for=token_for, reset=False)
 
     elif mode == "uninstall":
         return uninstall()
