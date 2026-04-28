@@ -345,3 +345,167 @@ def install(server_mode: bool = False, token_for: Optional[str] = None) -> int:
 
     return rc
 
+
+
+def uninstall() -> int:
+    """Remove Second Brain from the agent. Preserves brain.db backup."""
+    print("\n" + "="*60)
+    print("  UNINSTALL SECOND BRAIN")
+    print("="*60 + "\n")
+
+    profile = detect_agent()
+    brain_dir = profile.brain_dir
+    repo_dir = profile.home / "second-brain-sdk"
+    venv_path = profile.venv_candidates[0]
+
+    # Safety: require confirmation unless forced
+    print(f"This will remove:")
+    print(f"  • Brain directory: {brain_dir}")
+    print(f"  • Repository: {repo_dir}")
+    print(f"  • Virtual environment: {venv_path}")
+    print()
+    print("Your brain.db will be backed up first.")
+    print()
+
+    resp = input("Continue? (yes/no): ").strip().lower()
+    if resp != "yes":
+        print("Uninstall cancelled.")
+        return 0
+
+    # Backup brain.db before nuking
+    if brain_dir.exists():
+        backup = brain_dir.parent / f".second-brain.backup.{subprocess.check_output(['date','+%Y%m%d_%H%M%S']).decode().strip()}"
+        import shutil
+        shutil.copytree(brain_dir, backup)
+        print(f"[OK] Brain backed up to {backup}")
+
+    # Remove brain dir
+    if brain_dir.exists():
+        subprocess.run(["rm", "-rf", str(brain_dir)])
+        print(f"[OK] Removed {brain_dir}")
+
+    # Remove venv
+    if venv_path.exists():
+        subprocess.run(["rm", "-rf", str(venv_path)])
+        print(f"[OK] Removed venv {venv_path}")
+
+    # Remove repo (optional — ask)
+    if repo_dir.exists():
+        resp2 = input(f"Also remove cloned repo {repo_dir}? (yes/no): ").strip().lower()
+        if resp2 == "yes":
+            subprocess.run(["rm", "-rf", str(repo_dir)])
+            print(f"[OK] Removed repo {repo_dir}")
+        else:
+            print(f"Kept repo at {repo_dir}")
+
+    # Disable Hermes plugin if present
+    if profile.type == AgentType.HERMES:
+        plugin_dir = profile.home / ".hermes" / "plugins" / "second_brain"
+        if plugin_dir.exists():
+            subprocess.run(["rm", "-rf", str(plugin_dir)])
+            print(f"[OK] Removed Hermes plugin")
+        # Clean config
+        config_file = profile.home / ".hermes" / "config.yaml"
+        if config_file.exists():
+            import yaml
+            try:
+                cfg = yaml.safe_load(config_file.read_text()) or {}
+                plugins = cfg.get("plugins", {})
+                enabled = plugins.get("enabled", [])
+                if "second_brain" in enabled:
+                    enabled.remove("second_brain")
+                    config_file.write_text(yaml.dump(cfg))
+                    print("[OK] Disabled plugin in Hermes config")
+            except Exception as e:
+                print(f"[WARN] Could not update Hermes config: {e}")
+
+    print("\n[OK] Uninstall complete.")
+    print("To reinstall later: second-brain install")
+    return 0
+
+
+def restore(backup_dir: Optional[str] = None) -> int:
+    """Restore Second Brain from a backup."""
+    print("\n" + "="*60)
+    print("  RESTORE SECOND BRAIN")
+    print("="*60 + "\n")
+
+    profile = detect_agent()
+    brain_dir = profile.brain_dir
+
+    if backup_dir is None:
+        # Auto-discover latest backup in parent dirs
+        parent = brain_dir.parent
+        backups = sorted(parent.glob(".second-brain.backup.*"), key=os.path.getmtime, reverse=True)
+        if not backups:
+            print(f"No backups found in {parent}")
+            return 1
+        backup_dir = str(backups[0])
+        print(f"Found latest backup: {backup_dir}")
+
+    backup_path = Path(backup_dir)
+    if not backup_path.exists():
+        print(f"Backup not found: {backup_path}")
+        return 1
+
+    # Stop services if running
+    subprocess.run(["systemctl", "--user", "stop", "second-brain"], capture_output=True)
+
+    # Backup current brain if exists
+    if brain_dir.exists():
+        current_backup = brain_dir.parent / f".second-brain.before_restore.{subprocess.check_output(['date','+%Y%m%d_%H%M%S']).decode().strip()}"
+        import shutil
+        shutil.copytree(brain_dir, current_backup)
+        print(f"[INFO] Current brain backed up to {current_backup}")
+
+    # Restore
+    import shutil
+    if brain_dir.exists():
+        shutil.rmtree(brain_dir)
+    shutil.copytree(backup_path, brain_dir)
+    print(f"[OK] Restored from {backup_path}")
+
+    # Verify
+    python = profile.venv_candidates[0] / "bin/python"
+    if python.exists():
+        result = subprocess.run([str(python), "-m", "second_brain.cli", "status"], capture_output=True, text=True, env=os.environ)
+        if result.returncode == 0:
+            print("[OK] Brain verified after restore")
+        else:
+            print("[WARN] Verification failed — brain restored but may need attention")
+    else:
+        print("[INFO] Re-install SDK to run verification")
+
+    print("\nRestore complete.")
+    return 0
+
+
+def wizard() -> int:
+    """Interactive guided installation with safety checks and options."""
+    print("\n" + "="*60)
+    print("  SECOND BRAIN — INSTALLATION WIZARD")
+    print("="*60 + "\n")
+
+    print("This wizard will guide you through installing Second Brain.")
+    print("It can also uninstall or restore from backup if needed.\n")
+
+    mode = input("Choose mode [install/uninstall/restore]: ").strip().lower()
+
+    if mode == "install":
+        server = input("Server mode? (y/n): ").strip().lower() == "y"
+        token_for = None
+        if server:
+            token_for = input("Token for agent name (blank for hostname): ").strip() or None
+        return install(server_mode=server, token_for=token_for)
+
+    elif mode == "uninstall":
+        return uninstall()
+
+    elif mode == "restore":
+        backup = input("Backup directory (blank for latest): ").strip() or None
+        return restore(backup_dir=backup)
+
+    else:
+        print("Unknown mode:", mode)
+        return 1
+

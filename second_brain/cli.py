@@ -33,6 +33,10 @@ def _brain(brain_dir: Optional[Path]) -> Brain:
     return Brain(brain_dir) if brain_dir else Brain.default()
 
 
+from second_brain.installer import install as cli_install, uninstall, restore, wizard
+from second_brain.installer import uninstall, restore, wizard
+
+
 @app.command()
 def init(
     brain_dir: Optional[Path] = typer.Option(
@@ -355,22 +359,27 @@ def prune(
 ):
     """Delete old events and sessions (retention policy)."""
     from second_brain import Brain
-from second_brain.installer import install as cli_install
+    from datetime import datetime, timezone
+
     b = Brain(brain_dir) if brain_dir else Brain.default()
     b.init()
-    from datetime import datetime, timezone
+    store = b._store()
+
     cutoff = datetime.now(timezone.utc).replace(day=datetime.now().day - days)
     cutoff_iso = cutoff.isoformat()
-    store = b._store()
+
     with store.connect() as conn:
         evt = conn.execute("SELECT COUNT(*) FROM events WHERE ts < ?", (cutoff_iso,)).fetchone()[0]
         sess = conn.execute("SELECT COUNT(*) FROM sessions WHERE started_at < ?", (cutoff_iso,)).fetchone()[0]
+
         if dry_run:
             console.print(f"[yellow]Would delete:[/yellow] {evt} events, {sess} sessions older than {days} days")
             return
+
         if evt == 0 and sess == 0:
             console.print("[green]✓ Nothing to delete — retention policy satisfied.[/green]")
             return
+
         conn.execute("DELETE FROM events WHERE ts < ?", (cutoff_iso,))
         conn.execute("DELETE FROM sessions WHERE started_at < ?", (cutoff_iso,))
         conn.commit()
@@ -382,7 +391,6 @@ def status(
 ):
     """Show brain health, size, and statistics."""
     from second_brain import Brain
-from second_brain.installer import install as cli_install
     import os
     b = Brain(brain_dir) if brain_dir else Brain.default()
     b.init()
@@ -418,6 +426,29 @@ def install_command(
     if brain_dir:
         os.environ["SECOND_BRAIN_DIR"] = str(brain_dir)
     sys.exit(cli_install(server_mode=server, token_for=token_for))
+
+
+@app.command("uninstall")
+def uninstall_command(
+    brain_dir: Optional[Path] = typer.Option(None, "--brain-dir", envvar="SECOND_BRAIN_DIR"),
+):
+    """Remove Second Brain from this agent (with backup)."""
+    import os
+    if brain_dir:
+        os.environ["SECOND_BRAIN_DIR"] = str(brain_dir)
+    raise SystemExit(uninstall())
+
+
+@app.command("restore")
+def restore_command(
+    backup: Optional[str] = typer.Argument(None, help="Backup directory to restore from"),
+    brain_dir: Optional[Path] = typer.Option(None, "--brain-dir", envvar="SECOND_BRAIN_DIR"),
+):
+    """Restore Second Brain from a backup."""
+    import os
+    if brain_dir:
+        os.environ["SECOND_BRAIN_DIR"] = str(brain_dir)
+    raise SystemExit(restore(backup_dir=backup))
 
 
 if __name__ == "__main__":
