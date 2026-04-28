@@ -93,6 +93,7 @@ class Installer:
         self.requested_repo_path = repo_path
         self.reset_requested = reset
         self.noop_current = False
+        self.sync_plugin_only = False
 
     def run(self) -> int:
         """Execute all installation steps. Returns exit code."""
@@ -109,10 +110,20 @@ class Installer:
         ]
 
         for step in steps:
+            if self.sync_plugin_only and step not in {
+                self.check_prereqs,
+                self.setup_venv,
+                self.clone_repo,
+                self.evaluate_existing_install,
+                self.configure_hermes_plugin,
+            }:
+                continue
             rc = step()
             if rc != 0:
                 return rc
             if self.noop_current:
+                return 0
+            if self.sync_plugin_only and step == self.configure_hermes_plugin:
                 return 0
 
         return 0
@@ -312,6 +323,11 @@ raise SystemExit(1)
             if answer in {"y", "yes"}:
                 return self._backup_and_reset_brain()
 
+        if self.p.type == AgentType.HERMES and (self.repo_dir / "integrations" / "hermes").exists():
+            print("[OK] Already current; package/data unchanged. Hermes plugin will be synced idempotently.")
+            self.sync_plugin_only = True
+            return 0
+
         print("[OK] Already current; no changes will be made. To reset, rerun with --reset.")
         self.noop_current = True
         return 0
@@ -369,12 +385,11 @@ raise SystemExit(1)
         plugin_src = self.repo_dir / "integrations" / "hermes"
         plugin_dst = self.p.home / ".hermes" / "plugins" / "second_brain"
 
-        if plugin_dst.exists():
-            print(f"[OK] Plugin already deployed")
+        if plugin_src.exists():
+            shutil.copytree(plugin_src, plugin_dst, dirs_exist_ok=True)
+            print(f"[OK] Synced plugin to {plugin_dst}")
         else:
-            import shutil
-            shutil.copytree(plugin_src, plugin_dst)
-            print(f"[OK] Copied plugin to {plugin_dst}")
+            print(f"[WARN] Plugin source not found: {plugin_src}")
 
         # Enable in config
         config_file = self.p.home / ".hermes" / "config.yaml"
