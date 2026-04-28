@@ -40,14 +40,22 @@ class AgentProfile:
 def detect_agent() -> AgentProfile:
     """Inspect environment to determine agent type."""
     home = Path.home()
+    venv_override = os.environ.get("SECOND_BRAIN_VENV")
+    brain_override = os.environ.get("SECOND_BRAIN_DIR")
+
+    def venvs(*defaults: Path) -> List[Path]:
+        return [Path(venv_override).expanduser()] if venv_override else list(defaults)
+
+    def brain_dir(default: Path) -> Path:
+        return Path(brain_override).expanduser() if brain_override else default
 
     # Hermes: has ~/.hermes/config.yaml with plugins section
     if (home / ".hermes" / "config.yaml").exists():
         return AgentProfile(
             type=AgentType.HERMES,
             home=home,
-            venv_candidates=[home / ".hermes" / "hermes-agent" / "venv"],
-            brain_dir=home / ".second-brain",
+            venv_candidates=venvs(home / ".hermes" / "hermes-agent" / "venv"),
+            brain_dir=brain_dir(home / ".second-brain"),
         )
 
     # HeartMuLa: has ~/ai/heartlib directory
@@ -55,24 +63,31 @@ def detect_agent() -> AgentProfile:
         return AgentProfile(
             type=AgentType.HEARTMULA,
             home=home,
-            venv_candidates=[home / "ai" / "heartlib" / ".venv"],
-            brain_dir=home / ".second-brain",
+            venv_candidates=venvs(home / "ai" / "heartlib" / ".venv"),
+            brain_dir=brain_dir(home / ".second-brain"),
         )
 
     # Generic agent / worker
     return AgentProfile(
         type=AgentType.GENERIC,
         home=home,
-        venv_candidates=[home / ".venvs" / "second-brain"],
-        brain_dir=home / ".second-brain",
+        venv_candidates=venvs(home / ".venvs" / "second-brain"),
+        brain_dir=brain_dir(home / ".second-brain"),
     )
 
 
 class Installer:
-    def __init__(self, profile: AgentProfile, server_mode: bool = False, token_for: Optional[str] = None):
+    def __init__(
+        self,
+        profile: AgentProfile,
+        server_mode: bool = False,
+        token_for: Optional[str] = None,
+        repo_path: Optional[Path] = None,
+    ):
         self.p = profile
         self.server_mode = server_mode
         self.token_for = token_for
+        self.requested_repo_path = repo_path
 
     def run(self) -> int:
         """Execute all installation steps. Returns exit code."""
@@ -158,6 +173,21 @@ class Installer:
 
     def clone_repo(self) -> int:
         print("\n=== Repository ===")
+        if self.requested_repo_path is not None:
+            repo_dir = self.requested_repo_path.expanduser().resolve()
+            if not repo_dir.exists():
+                print(f"[FAIL] Repo path does not exist: {repo_dir}")
+                return 1
+            if not (repo_dir / "pyproject.toml").exists():
+                print(f"[FAIL] Not a Second Brain repo (missing pyproject.toml): {repo_dir}")
+                return 1
+            if not (repo_dir / "second_brain").exists():
+                print(f"[FAIL] Not a Second Brain repo (missing second_brain package): {repo_dir}")
+                return 1
+            print(f"[OK] Using supplied repo path: {repo_dir}")
+            self.repo_dir = repo_dir
+            return 0
+
         repo_dir = self.p.home / "second-brain-sdk"
         if repo_dir.exists() and (repo_dir / ".git").exists():
             print(f"[OK] Repo present: {repo_dir}")
@@ -322,8 +352,12 @@ class Installer:
             return 1
 
 
-def install(server_mode: bool = False, token_for: Optional[str] = None) -> int:
-    """CLI entry: second-brain install [--server] [--token-for AGENT]"""
+def install(
+    server_mode: bool = False,
+    token_for: Optional[str] = None,
+    repo_path: Optional[str] = None,
+) -> int:
+    """CLI entry: second-brain install [REPO_PATH] [--server] [--token-for AGENT]"""
     print("\n" + "="*60)
     print("  SECOND BRAIN — AUTONOMOUS INSTALLATION")
     print("="*60 + "\n")
@@ -333,9 +367,12 @@ def install(server_mode: bool = False, token_for: Optional[str] = None) -> int:
     print(f"Home dir   : {profile.home}")
     print(f"Brain dir  : {profile.brain_dir}")
     print(f"Server mode: {server_mode}")
+    repo = Path(repo_path).expanduser().resolve() if repo_path else None
+    if repo is not None:
+        print(f"Repo path  : {repo}")
     print()
 
-    installer = Installer(profile, server_mode=server_mode, token_for=token_for)
+    installer = Installer(profile, server_mode=server_mode, token_for=token_for, repo_path=repo)
     rc = installer.run()
 
     if rc == 0:

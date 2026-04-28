@@ -418,15 +418,19 @@ def status(
 
 @app.command("install")
 def install_command(
+    repo_path: Optional[Path] = typer.Argument(
+        None,
+        help="Optional path to an existing second-brain-sdk repo. If omitted, installer uses/clones ~/second-brain-sdk.",
+    ),
     server: bool = typer.Option(False, "--server", "-s", help="Install server mode (write-only HTTP API)"),
     token_for: Optional[str] = typer.Option(None, "--token-for", help="Create token for specified agent (server mode only)"),
     brain_dir: Optional[Path] = typer.Option(None, "--brain-dir", envvar="SECOND_BRAIN_DIR"),
 ):
-    """Autonomous self-install: detect agent, set up brain, configure integration."""
+    """Autonomous self-install: optionally use a supplied repo path, set up brain, configure integration."""
     import os
     if brain_dir:
         os.environ["SECOND_BRAIN_DIR"] = str(brain_dir)
-    sys.exit(cli_install(server_mode=server, token_for=token_for))
+    sys.exit(cli_install(server_mode=server, token_for=token_for, repo_path=str(repo_path) if repo_path else None))
 
 
 @app.command("uninstall")
