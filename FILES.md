@@ -1,197 +1,74 @@
-# Second Brain SDK — File Index
+# Second Brain — File Index
 
 ## 🗂️ Repository Structure
 
 ```
-second-brain-sdk/
+second-brain/
 ├── README.md                    # Main project documentation
 ├── LICENSE                      # MIT License
-├── pyproject.toml               # Build configuration (setuptools)
-├── requirements.txt             # Runtime dependencies
-├── requirements-dev.txt         # Dev dependencies
+├── pyproject.toml               # Build configuration
+├── requirements.txt             # Runtime dependencies (convenience)
 ├── .gitignore                   # Git ignore rules
-├── .github/
-│   └── workflows/
-│       └── ci.yml               # GitHub Actions CI (test, lint, build)
 ├── second_brain/
-│   ├── __init__.py              # Package exports
-│   ├── core.py                  # Vault, Event, Credential classes
-│   ├── session.py               # Session tracking + task context manager
-│   ├── query.py                 # Fluent query builder for events
-│   ├── credentials.py           # CredentialManager (store/rotate/retrieve)
-│   └── cli.py                   # Command-line interface (click + rich)
+│   ├── __init__.py              # Public exports
+│   ├── cli.py                   # Typer-based CLI entrypoint
+│   ├── brain.py                 # SQLite Brain core (events + encrypted credentials)
+│   ├── crypto/
+│   │   └── keys.py              # Fernet key management
+│   ├── models/
+│   │   └── credential.py        # Pydantic record(s)
+│   ├── storage/
+│   │   ├── schema.sql           # SQLite schema (events, credentials, tokens)
+│   │   └── sqlite_store.py      # SQLiteStore (WAL mode, transactions)
+│   └── server/
+│       ├── __init__.py          # Optional server entry
+│       └── app.py               # FastAPI write-only ingestion
 ├── examples/
-│   ├── __init__.py
-│   ├── quickstart.py            # Minimal "hello world" example
-│   └── hermes_integration.py    # Full Hermes agent integration pattern
+│   ├── quickstart.py            # Minimal example using Brain
+│   ├── agent_workflow.py        # Example workflow (events + credentials)
+│   └── hermes_integration.py    # Framework-agnostic integration pattern
 ├── tests/
-│   ├── __init__.py
-│   └── test_sdk.py              # Unit tests for Vault, Session, Credentials, Query
-├── docs/
-│   └── USAGE.md                 # Comprehensive usage guide
-└── scripts/
-    └── create_project.py        # SDK scaffolding script (future)
+│   └── test_sdk.py              # Legacy Vault tests (kept while migrating)
+└── docs/
+    ├── USAGE.md                 # Standalone usage guide
+    └── PLAN_CHECKLIST.md        # Generalization plan/checklist
 ```
 
 ---
 
-## 📦 Module Reference
+## Storage files on disk (runtime)
 
-### `core.py` — Vault, Event, Credential
+Default brain directory: `~/.second-brain/` (override with `SECOND_BRAIN_DIR`)
 
-**Classes:**
-- `Event` — dataclass for a single log entry
-- `Credential` — dataclass for encrypted credential metadata
-- `Vault` — main encrypted store
+- `brain.db` — SQLite database
+  - `events` table stores plaintext event logs
+  - `credentials` table stores encrypted credential values (`value_enc`)
+  - `api_tokens` table stores hashed write tokens for server mode
 
-Key methods:
-```python
-Vault.log_event(type, title, ...) → Event
-Vault.get_events(project=..., tags=..., limit=...) → list
-Vault.add_credential(service, kind, context, value) → Credential
-Vault.get_credential(cred_id) → str | None
-Vault.register_skill(name, category, path, purpose) → dict
-Vault.set_identity(agent, user) → None
-Vault.export_session_summary(session_id) → str
-Vault.get_statistics() → dict
+- `brain.key` — Fernet key for credential encryption/decryption
+
+**Back up `brain.key`.** Without it, encrypted credentials cannot be recovered.
+
+---
+
+## Optional server mode
+
+Install extras:
+```bash
+pip install 'second-brain[server]'
 ```
 
-### `session.py` — Session
-
-**Class:**
-- `Session` — groups events into a conversation/work session
-
-Key methods:
-```python
-Session(vault, project, session_id=None) → Session
-Session.log(type, title, ...) → Event
-Session.task(title, ...) → context manager (auto-logs start/completion/failure)
-Session.decision(title, details, reasoning, alternatives) → Event
-Session.milestone(title, details) → Event
-Session.end(summary) → str (markdown)
-Session.save_summary(output_dir) → str (filepath)
-```
-
-### `query.py` — Filter & Search
-
-**Class:**
-- `Query` — fluent query builder
-
-Usage:
-```python
-Query(vault).project("myapp").tag("api").passed().limit(10).all()
-Query(vault).failed().since("2026-04-27").all()
-Query.recent_failures(vault, hours=24)
-Query.by_project(vault, "nook-polish")
-Query.milestone_timeline(vault)
-```
-
-### `credentials.py` — Credential Manager
-
-**Class:**
-- `CredentialManager` — high-level API for encrypted secrets
-
-Methods:
-```python
-CredentialManager(vault)
-  .store(service, kind, context, value, ...) → Credential
-  .retrieve(cred_id) → str
-  .find_by_service(service) → list[metadata]
-  .mark_used(cred_id) → None
-  .rotate(cred_id, new_value, reason) → new_credential
-```
-
-### `cli.py` — Command-Line Interface
-
-Commands:
+Run:
 ```bash
 second-brain init
-second-brain log <type> <title> [options]
-second-brain events [--project X] [--tag Y] [--failed]
-second-brain stats
-second-brain credential add|list|get|rotate
-second-brain summary
-second-brain export
-second-brain info
+second-brain server token-create --agent agentA
+second-brain server serve --host 0.0.0.0 --port 8009
 ```
 
----
-
-## 🔐 File Format Details
-
-### `vault.json.enc` (encrypted)
-
-Fernet-encrypted JSON blob. Full structure:
-
-```json
-{
-  "version": "1.0",
-  "created_at": "ISO8601",
-  "events": [ { ... Event dict ... } ],
-  "credentials": [ { ... Credential dict (encrypted_value field) ... } ],
-  "skills_created": [ { name, category, path, purpose, status, created_at } ],
-  "identity": { "agent": {...}, "user": {...} }
-}
+Write events:
+```bash
+curl -X POST http://localhost:8009/v1/events \
+  -H "Authorization: Bearer <TOKEN>" \
+  -H "Content-Type: application/json" \
+  -d '{"type":"task_started","title":"hello"}'
 ```
-
-### `decryption_key.key`
-
-32-byte URL-safe base64 Fernet key. Example:
-```
-gAAAAABmY2R4Z... (44 chars)
-```
-
-**Back this up!** Without it, the vault is unrecoverable.
-
-### `config.yaml`
-
-```yaml
-retention_days: 365
-auto_summarize: true
-export_quarterly: true
-key_backup_reminder: "Monthly: backup decryption_key.key to external storage"
-```
-
-### `identity.json`
-
-Quick-reference identity (not encrypted):
-
-```json
-{
-  "agent": { "name": "Hermes", ... },
-  "user": { "name": "Snooky Gomez", "alias": "Snow", ... }
-}
-```
-
-### `sessions/*.md`
-
-Markdown session summaries (human-readable timeline).
-
-### `index.md`
-
-Top-level index linking to sessions — Markdown file for easy browsing.
-
----
-
-## 🚀 Deployment to PyPI
-
-1. Bump version in `pyproject.toml` and `__init__.py`
-2. Build: `python -m build`
-3. Check: `twine check dist/*`
-4. Upload: `twine upload dist/*` (requires PyPI token)
-
-GitHub Actions will auto-publish on tag push when enabled.
-
----
-
-## 🤝 Contributing
-
-- Add tests in `tests/`
-- Format with `black` and `isort`
-- Type-check with `mypy`
-- Update `docs/` with new usage patterns
-- Keep `CHANGELOG.md` updated (create one if publishing)
-
----
-
-**Index generated from source tree.** For full docs, see README.md and docs/USAGE.md.

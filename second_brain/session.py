@@ -211,7 +211,8 @@ class Session:
         """Save summary to a markdown file and return the path."""
         md = self.end()
         if output_dir is None:
-            output_dir = Path.home() / ".hermes" / "profiles" / "snow" / "second_brain" / "sessions"
+            # Standalone default (no Hermes assumptions)
+            output_dir = Path.home() / ".second-brain" / "sessions"
         else:
             output_dir = Path(output_dir)
 
