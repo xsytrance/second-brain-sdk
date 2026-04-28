@@ -96,6 +96,8 @@ Default directory: `~/.second-brain/`
 
 Use this if you want other agents to write events **without sharing** your DB file or `brain.key`.
 
+See: `docs/SERVER.md` for deployment notes (reverse proxy / HTTPS / token rotation).
+
 ### Start server
 ```bash
 export SECOND_BRAIN_DIR=~/.second-brain
