@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Minimal example: create a Second Brain and log a task."""
 from pathlib import Path
-from second_brain_sdk import Vault, Session
+from second_brain import Vault, Session
 
 # Point to brain directory (or let default)
 brain_dir = Path.home() / ".hermes" / "profiles" / "snow" / "second_brain"

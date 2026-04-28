@@ -1,5 +1,5 @@
-"""Second Brain SDK — Event-sourced knowledge base for AI agents."""
-__version__ = "1.0.0"
+"""Second Brain — standalone, agent-friendly memory + credential vault."""
+__version__ = "0.1.0"
 __author__ = "Hermes Agent"
 __email__ = "hermes@nousresearch.com"
 

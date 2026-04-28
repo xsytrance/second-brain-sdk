@@ -13,7 +13,7 @@ second-brain-sdk/
 ├── .github/
 │   └── workflows/
 │       └── ci.yml               # GitHub Actions CI (test, lint, build)
-├── second_brain_sdk/
+├── second_brain/
 │   ├── __init__.py              # Package exports
 │   ├── core.py                  # Vault, Event, Credential classes
 │   ├── session.py               # Session tracking + task context manager

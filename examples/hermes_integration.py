@@ -14,7 +14,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
-from second_brain_sdk import Vault, Session, CredentialManager, Query
+from second_brain import Vault, Session, CredentialManager, Query
 
 
 class HermesWithMemory:

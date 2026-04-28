@@ -16,7 +16,7 @@
 ## Quick Start
 
 ```python
-from second_brain_sdk import Vault
+from second_brain import Vault
 
 # Point to your encrypted vault
 vault = Vault("~/.hermes/prof/snow/second_brain/vault.json.enc")
@@ -32,7 +32,7 @@ vault.log_event("milestone", "First event logged", project="demo")
 Events are the core data structure. Every meaningful action should be an event.
 
 ```python
-from second_brain_sdk import Vault
+from second_brain import Vault
 
 vault = Vault(...)
 
@@ -67,7 +67,7 @@ vault.log_event(
 Session tracks a single conversation or work session.
 
 ```python
-from second_brain_sdk import Vault, Session
+from second_brain import Vault, Session
 
 vault = Vault(...)
 
@@ -98,7 +98,7 @@ filepath = session.save_summary()  # saved to sessions/
 ## Credentials
 
 ```python
-from second_brain_sdk import Vault, CredentialManager
+from second_brain import Vault, CredentialManager
 
 vault = Vault(...)
 creds = CredentialManager(vault)
@@ -140,7 +140,7 @@ new_cred = creds.rotate(
 ## Querying
 
 ```python
-from second_brain_sdk import Query, Vault
+from second_brain import Query, Vault
 
 vault = Vault(...)
 
@@ -251,7 +251,7 @@ second-brain info      # vault path, stats, identity
 Create a middleware that wraps each agent turn:
 
 ```python
-from second_brain_sdk import Vault, Session
+from second_brain import Vault, Session
 
 # Load at agent startup
 vault = Vault.from_env()  # reads SECOND_BRAIN_DIR
@@ -279,7 +279,7 @@ second-brain log git_commit \
 ### Cron Job (Daily Digest)
 
 ```python
-from second_brain_sdk import Query, Vault
+from second_brain import Query, Vault
 vault = Vault(...)
 
 yesterday = (datetime.now() - timedelta(days=1)).isoformat()

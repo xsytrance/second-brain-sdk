@@ -53,7 +53,7 @@ second-brain init
 ## Basic Usage
 
 ```python
-from second_brain_sdk import Vault, Session, CredentialManager
+from second_brain import Vault, Session, CredentialManager
 
 # Point to your brain directory
 vault = Vault("~/.hermes/profiles/snow/second_brain/vault.json.enc")
@@ -220,7 +220,7 @@ second-brain rotate-key --old-key /path/to/old.key --new-key /path/to/new.key
 Wrap your agent's main loop:
 
 ```python
-from second_brain_sdk import Vault, Session
+from second_brain import Vault, Session
 
 brain = Vault("~/.hermes/profiles/snow/second_brain/vault.json.enc")
 session = Session(brain, project="current-work")
@@ -251,7 +251,7 @@ def handle_request(request):
 ## Query Examples
 
 ```python
-from second_brain_sdk import Query, Vault
+from second_brain import Query, Vault
 vault = Vault(...)
 
 # Recent failures

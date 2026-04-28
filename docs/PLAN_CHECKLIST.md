@@ -18,7 +18,7 @@
 - [ ] CLI entrypoint: `second-brain`
 
 ### 0.3 Restructure package layout
-- [ ] Move `second_brain_sdk/` → `second_brain/`
+- [x] Move `second_brain_sdk/` → `second_brain/`
 - [ ] Keep public imports in `second_brain/__init__.py`
 
 ### 0.4 Dependencies

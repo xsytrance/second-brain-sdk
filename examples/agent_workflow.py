@@ -4,7 +4,7 @@ import os
 from datetime import datetime, timezone
 from pathlib import Path
 
-from second_brain_sdk import Vault, Session, CredentialManager, Query
+from second_brain import Vault, Session, CredentialManager, Query
 
 def demo():
     # Initialize vault (will auto-create if missing)
