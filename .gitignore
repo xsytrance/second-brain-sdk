@@ -58,3 +58,7 @@ env/
 /dist_wheel/
 *.whl
 *.tar.gz
+
+*.db-wal
+
+*.db-shm
